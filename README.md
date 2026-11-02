@@ -6,6 +6,11 @@
 
 *在瀏覽器中將法規、SOP 與專業文件消化提煉，一鍵編譯為具備事實證據鏈的微型獨立應用*
 
+🌐 **語言 / Languages / 言語**:  
+[ 繁體中文 ](README.md) • [ English ](README.en.md) • [ 简体中文 ](README.zh-CN.md) • [ 日本語 ](README.ja.md)
+
+---
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Architecture: Local--First](https://img.shields.io/badge/Architecture-Local--First%20%7C%20Zero--Backend-38bdf8.svg)](ARCHITECTURE.md)
 [![Vector: gemini--embedding--2](https://img.shields.io/badge/Vector-gemini--embedding--2%20(768d)-a855f7.svg)](ADR/ADR-0001-gemini-embedding-2-and-binary-store.md)
@@ -164,4 +169,4 @@ ZeroRAG/
 ## 📄 授權條款 (License)
 
 本專案採用 [MIT License](LICENSE) 開源授權，歡迎自由研究、教學、二次開發與商業應用。  
-由 **彥廷 (etrnya)** 於 2026 年精心打造。
+由 **etrnya** 於 2026 年精心打造。
