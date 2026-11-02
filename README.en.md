@@ -11,7 +11,7 @@
 
 ---
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Architecture: Local--First](https://img.shields.io/badge/Architecture-Local--First%20%7C%20Zero--Backend-38bdf8.svg)](ARCHITECTURE.md)
 [![Vector: gemini--embedding--2](https://img.shields.io/badge/Vector-gemini--embedding--2%20(768d)-a855f7.svg)](ADR/ADR-0001-gemini-embedding-2-and-binary-store.md)
 [![Benchmark: P95 < 3ms](https://img.shields.io/badge/Latency-P95%20%3D%202.88ms-10b981.svg)](SPIKES/spike-b/RESULT.md)
@@ -129,7 +129,7 @@ ZeroRAG/
 ├── GLOSSARY.md                    <-- Domain Glossary (Dictionary First)
 ├── PRD.md                         <-- Product Requirements Document (v1.1.1)
 ├── SECURITY.md                    <-- Security Invariants & Guardrails
-└── LICENSE                        <-- MIT License
+└── LICENSE                        <-- Apache 2.0 License
 ```
 
 ---
@@ -166,5 +166,5 @@ Total Tests: 17, Passed: 17, Failed: 0
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).  
+This project is licensed under the [Apache License 2.0](LICENSE) with complete patent and trademark protections.  
 Crafted with precision by **etrnya** (2026).

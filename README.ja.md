@@ -11,7 +11,7 @@
 
 ---
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Architecture: Local--First](https://img.shields.io/badge/Architecture-Local--First%20%7C%20Zero--Backend-38bdf8.svg)](ARCHITECTURE.md)
 [![Vector: gemini--embedding--2](https://img.shields.io/badge/Vector-gemini--embedding--2%20(768d)-a855f7.svg)](ADR/ADR-0001-gemini-embedding-2-and-binary-store.md)
 [![Benchmark: P95 < 3ms](https://img.shields.io/badge/Latency-P95%20%3D%202.88ms-10b981.svg)](SPIKES/spike-b/RESULT.md)
@@ -138,5 +138,5 @@ Total Tests: 17, Passed: 17, Failed: 0
 
 ## 📄 ライセンス (License)
 
-本プロジェクトは [MIT License](LICENSE) のもとで公開されています。  
+本プロジェクトは [Apache License 2.0](LICENSE) のもとで公開されており、完全な特許および商標保護条項を含みます。  
 Crafted with care by **etrnya** (2026).

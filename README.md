@@ -11,7 +11,7 @@
 
 ---
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Architecture: Local--First](https://img.shields.io/badge/Architecture-Local--First%20%7C%20Zero--Backend-38bdf8.svg)](ARCHITECTURE.md)
 [![Vector: gemini--embedding--2](https://img.shields.io/badge/Vector-gemini--embedding--2%20(768d)-a855f7.svg)](ADR/ADR-0001-gemini-embedding-2-and-binary-store.md)
 [![Benchmark: P95 < 3ms](https://img.shields.io/badge/Latency-P95%20%3D%202.88ms-10b981.svg)](SPIKES/spike-b/RESULT.md)
@@ -161,12 +161,12 @@ ZeroRAG/
 ├── PRD.md                         <-- 產品需求規劃規格書 (v1.1.1)
 ├── SECURITY.md                    <-- 資安防禦與不變性守則手冊
 ├── package.json                   <-- 專案元數據與 npm 指令
-└── LICENSE                        <-- MIT 開源授權條款
+└── LICENSE                        <-- Apache 2.0 開源授權條款
 ```
 
 ---
 
 ## 📄 授權條款 (License)
 
-本專案採用 [MIT License](LICENSE) 開源授權，歡迎自由研究、教學、二次開發與商業應用。  
+本專案採用 [Apache License 2.0](LICENSE) 開源授權，具備完整的專利防禦與授權保護，歡迎自由研究、教學、二次開發與商業應用。  
 由 **etrnya** 於 2026 年精心打造。
