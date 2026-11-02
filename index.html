@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="0; url=src/ui/index.html">
+  <title>正在載入 ZeroRAG Studio...</title>
+  <script>
+    window.location.replace("src/ui/index.html");
+  </script>
+  <style>
+    body {
+      background: #090d16;
+      color: #94a3b8;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(56, 189, 248, 0.2);
+      border-top-color: #38bdf8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    a { color: #38bdf8; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <p>正在前往 <strong>ZeroRAG Studio</strong> 工作台...</p>
+  <p style="font-size: 13px;">若未自動跳轉，請 <a href="src/ui/index.html">點擊此處直接進入</a></p>
+</body>
+</html>

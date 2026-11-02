@@ -48,13 +48,10 @@ jobs:
       - name: Prepare Pages Artifact
         run: |
           mkdir -p _site
-          # Copy src and spikes for interactive browser execution
           cp -r src _site/
           cp -r SPIKES _site/
-          # Place Studio as the root index
-          cp src/ui/index.html _site/index.html
-          cp src/ui/style.css _site/style.css
-          cp src/ui/app.js _site/app.js
+          cp index.html _site/index.html
+          cp .nojekyll _site/.nojekyll
 
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
