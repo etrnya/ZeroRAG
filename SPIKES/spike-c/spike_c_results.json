@@ -1,0 +1,26 @@
+{
+  "count": 3000,
+  "dim": 768,
+  "c1": {
+    "name": "C1 (Base64 純文字)",
+    "sizeMB": "12.56",
+    "decodeDurMs": "2.5",
+    "pass15MB": true
+  },
+  "c2": {
+    "name": "C2 (Gzip + Base64)",
+    "sizeMB": "10.85",
+    "decompressDurMs": "36.5",
+    "pass15MB": true
+  },
+  "c3": {
+    "name": "C3 (雙檔 app.html + .bin)",
+    "sizeMB": "9.77",
+    "pass15MB": true
+  },
+  "c4": {
+    "name": "C4 (Int8 量化)",
+    "sizeMB": "3.06",
+    "overlapRatePct": "98.8"
+  }
+}

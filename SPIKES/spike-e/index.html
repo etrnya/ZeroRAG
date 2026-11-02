@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZeroRAG Spike E — Browser → Gemini 驗證頁</title>
+<!-- 拋棄式 Spike 程式碼。不得搬入 src/。不得寫入任何 API Key。 -->
+<script>
+/* ============================================================
+ * E-F 網路稽核：必須在任何 SDK 載入前就攔截 fetch 與 console，
+ * 這樣 SDK 發出的請求和輸出的 log 也會被記錄下來。
+ * ============================================================ */
+window.__spike = { requests: [], consoleLines: [], getKey: () => '' };
+(function installAudit() {
+  const origFetch = window.fetch.bind(window);
+  window.fetch = async function (input, init = {}) {
+    const url = typeof input === 'string' ? input : (input && input.url) || String(input);
+    const method = (init.method || (input && input.method) || 'GET').toUpperCase();
+    let headerNames = [];
+    try {
+      const h = new Headers(init.headers || (input && input.headers) || {});
+      headerNames = [...h.keys()];
+    } catch (_) {}
+    let bodyText = '';
+    if (typeof init.body === 'string') bodyText = init.body;
+    const rec = {
+      t: new Date().toISOString(), method, host: safeHost(url),
+      path: safePath(url), headerNames, bodyBytes: bodyText.length,
+      _url: url, _body: bodyText, status: null, ms: null
+    };
+    window.__spike.requests.push(rec);
+    const t0 = performance.now();
+    try {
+      const res = await origFetch(input, init);
+      rec.status = res.status; rec.ms = Math.round(performance.now() - t0);
+      window.__renderNet && window.__renderNet();
+      return res;
+    } catch (e) {
+      rec.status = 'NETWORK_ERROR: ' + e.message; rec.ms = Math.round(performance.now() - t0);
+      window.__renderNet && window.__renderNet();
+      throw e;
+    }
+  };
+  ['log', 'info', 'warn', 'error', 'debug'].forEach(fn => {
+    const orig = console[fn].bind(console);
+    console[fn] = (...args) => {
+      try { window.__spike.consoleLines.push(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ')); } catch (_) {}
+      orig(...args);
+    };
+  });
+  function safeHost(u) { try { return new URL(u, location.href).host; } catch (_) { return '?'; } }
+  function safePath(u) { try { return new URL(u, location.href).pathname; } catch (_) { return '?'; } }
+})();
+</script>
+<style>
+  :root { --bg:#0f1117; --card:#181b24; --line:#2a2f3d; --text:#e6e8ee; --dim:#9aa3b2; --ok:#3ecf8e; --bad:#ff6b6b; --warn:#f5c451; --acc:#7aa2ff; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Inter","Noto Sans TC",system-ui,sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+  header { padding:16px 20px; border-bottom:1px solid var(--line); }
+  h1 { font-size:18px; margin:0 0 6px; }
+  .env { color:var(--dim); font-family: ui-monospace,Consolas,monospace; font-size:12px; }
+  main { display:grid; grid-template-columns: repeat(auto-fit, minmax(420px,1fr)); gap:14px; padding:16px 20px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  h2 { font-size:15px; margin:0 0 10px; }
+  label { display:block; margin:6px 0; color:var(--dim); }
+  input[type=password], input[type=text], select { width:100%; padding:8px; background:#0b0d13; color:var(--text); border:1px solid var(--line); border-radius:6px; }
+  button { background:#232838; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:7px 12px; margin:4px 4px 4px 0; cursor:pointer; }
+  button:hover { border-color:var(--acc); }
+  pre { background:#0b0d13; border:1px solid var(--line); border-radius:6px; padding:8px; white-space:pre-wrap; word-break:break-all; max-height:260px; overflow:auto; font-size:12px; margin:8px 0 0; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  td, th { border-bottom:1px solid var(--line); padding:4px 6px; text-align:left; }
+  .PASS { color:var(--ok); font-weight:600; } .FAIL { color:var(--bad); font-weight:600; } .WARN { color:var(--warn); font-weight:600; }
+  .note { color:var(--warn); font-size:12px; }
+  .full { grid-column: 1 / -1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ZeroRAG Spike E — 瀏覽器直連 Gemini 驗證頁</h1>
+  <div class="env" id="env"></div>
+  <div class="note">只能使用公開或測試文字。金鑰只在執行時輸入，本頁不會把金鑰寫進任何檔案；匯出的報告會遮蔽金鑰。</div>
+</header>
+
+<main>
+  <!-- 金鑰與 Provider -->
+  <section>
+    <h2>① 金鑰與 Provider 設定（E-E）</h2>
+    <label>Gemini API Key（建議使用免費測試金鑰）
+      <input type="password" id="apiKey" autocomplete="off" placeholder="AIza...">
+    </label>
+    <label>金鑰保存方式</label>
+    <label><input type="radio" name="keyMode" value="memory" checked> 只存記憶體（預設，關閉分頁就消失）</label>
+    <label><input type="radio" name="keyMode" value="session"> sessionStorage（同分頁重新整理仍保留）</label>
+    <label><input type="radio" name="keyMode" value="local"> localStorage（⚠ 會長期留在這台電腦）</label>
+    <button id="btnSaveKey">套用金鑰</button>
+    <button id="btnClearKey">🗑️ 清除金鑰（所有儲存位置）</button>
+    <label>AI Provider
+      <select id="provider">
+        <option value="rest">E-1：REST 原生 fetch</option>
+        <option value="sdk">E-2：官方 @google/genai（CDN ESM）</option>
+      </select>
+    </label>
+    <pre id="keyOut">尚未設定金鑰</pre>
+  </section>
+
+  <!-- 連線與模型 -->
+  <section>
+    <h2>② 連線測試與模型清單（E-A）</h2>
+    <button id="btnList">列出可用模型（models.list）</button>
+    <button id="btnFakeKey">用假金鑰測試錯誤回應</button>
+    <label>生成模型（列出模型後可選）
+      <select id="genModel"><option value="">— 先執行 models.list —</option></select>
+    </label>
+    <pre id="listOut"></pre>
+  </section>
+
+  <!-- Embedding -->
+  <section>
+    <h2>③ Embedding 測試（E-B）</h2>
+    <div class="env">模型 gemini-embedding-2，outputDimensionality = 768，依官方建議加上 task 前綴</div>
+    <button id="btnEmbedBatch">批次 Embedding（3 篇文件 + 1 個查詢）</button>
+    <button id="btnEmbedMulti">測試：一次送 3 段文字會回傳幾個向量？</button>
+    <pre id="embedOut"></pre>
+  </section>
+
+  <!-- Generation -->
+  <section>
+    <h2>④ 生成測試（E-C）</h2>
+    <button id="btnGen">簡單生成：1 + 1 = ?</button>
+    <button id="btnJson">Structured Output（JSON Schema）</button>
+    <button id="btnStream">串流（SSE，僅 REST）</button>
+    <pre id="genOut"></pre>
+  </section>
+
+  <!-- 紅隊 -->
+  <section class="full">
+    <h2>⑤ 金鑰紅隊檢查（E-E / E-F）</h2>
+    <button id="btnRedTeam">執行紅隊檢查</button>
+    <button id="btnDeletedKey">測試：清除金鑰後還能呼叫嗎？</button>
+    <button id="btnReport">下載測試報告（JSON，金鑰已遮蔽）</button>
+    <table id="redTable"><thead><tr><th>#</th><th>檢查項目</th><th>結果</th><th>說明</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <!-- 網路紀錄 -->
+  <section class="full">
+    <h2>⑥ 對外請求紀錄（S6 Visible Egress）</h2>
+    <table id="netTable"><thead><tr><th>時間</th><th>方法</th><th>主機</th><th>路徑</th><th>Header 名稱</th><th>Body 大小</th><th>狀態</th><th>ms</th></tr></thead><tbody></tbody></table>
+  </section>
+</main>
+
+<script type="module">
+/* ============================================================
+ * 狀態
+ * ============================================================ */
+const BASE = 'https://generativelanguage.googleapis.com/v1beta';
+const EMBED_MODEL = 'gemini-embedding-2';
+const DIM = 768;
+const ALLOWED_HOSTS = ['generativelanguage.googleapis.com', 'cdn.jsdelivr.net'];
+let memoryKey = '';
+const results = {};   // 給報告用
+
+const $ = id => document.getElementById(id);
+const show = (id, obj) => { $(id).textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2); }; // S8：只用 textContent
+
+$('env').textContent = `origin=${location.origin} | protocol=${location.protocol} | UA=${navigator.userAgent}`;
+results.environment = { origin: location.origin, protocol: location.protocol, userAgent: navigator.userAgent, startedAt: new Date().toISOString() };
+
+/* ============================================================
+ * 金鑰管理（E-E）
+ * ============================================================ */
+const STORAGE_NAME = 'zerorag_spike_key';
+function getKey() {
+  return memoryKey || sessionStorage.getItem(STORAGE_NAME) || localStorage.getItem(STORAGE_NAME) || '';
+}
+window.__spike.getKey = getKey;
+function currentMode() { return document.querySelector('input[name=keyMode]:checked').value; }
+
+$('btnSaveKey').onclick = () => {
+  const k = $('apiKey').value.trim();
+  if (!k) return show('keyOut', '請先輸入金鑰');
+  clearAllKeys();
+  const mode = currentMode();
+  if (mode === 'memory') memoryKey = k;
+  if (mode === 'session') sessionStorage.setItem(STORAGE_NAME, k);
+  if (mode === 'local') localStorage.setItem(STORAGE_NAME, k);
+  $('apiKey').value = '';             // 讓 input 欄位不再持有金鑰
+  results.keyMode = mode;
+  show('keyOut', `已套用金鑰（模式：${mode}，長度 ${k.length}，結尾 …${k.slice(-4)}）`);
+};
+function clearAllKeys() {
+  memoryKey = '';
+  sessionStorage.removeItem(STORAGE_NAME);
+  localStorage.removeItem(STORAGE_NAME);
+}
+$('btnClearKey').onclick = () => { clearAllKeys(); sdkClient = null; show('keyOut', '已清除記憶體、sessionStorage、localStorage 中的金鑰'); };
+
+/* ============================================================
+ * AIProvider 抽象：REST 與 SDK 兩種實作（使用者建議的介面）
+ * interface AIProvider { listModels(); embed(texts); generate(prompt, opts) }
+ * ============================================================ */
+function requireKey() {
+  const k = getKey();
+  if (!k) throw new Error('LOCAL_GUARD: 沒有金鑰，請求在本機就被擋下，沒有送出任何網路請求');
+  return k;
+}
+
+const GeminiRestProvider = {
+  name: 'rest',
+  async call(path, body, method = 'POST', keyOverride) {
+    const key = keyOverride ?? requireKey();
+    const res = await fetch(`${BASE}${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, // 金鑰放 header，不放 URL
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw Object.assign(new Error(json?.error?.message || res.statusText), { status: res.status, body: json });
+    return json;
+  },
+  async listModels() {
+    const j = await this.call('/models?pageSize=1000', null, 'GET');
+    return (j.models || []).map(m => ({ name: m.name.replace('models/', ''), methods: m.supportedGenerationMethods || [] }));
+  },
+  async embed(texts) {
+    // 每段文字一個 request → 每段得到一個獨立向量
+    const j = await this.call(`/models/${EMBED_MODEL}:batchEmbedContents`, {
+      requests: texts.map(t => ({ model: `models/${EMBED_MODEL}`, content: { parts: [{ text: t }] }, outputDimensionality: DIM }))
+    });
+    return (j.embeddings || []).map(e => e.values);
+  },
+  async embedMultiInOne(texts) {
+    // 一個 request 裡放多段文字：官方文件說 gemini-embedding-2 會合併成一個向量
+    const j = await this.call(`/models/${EMBED_MODEL}:embedContent`, {
+      content: { parts: texts.map(t => ({ text: t })) }, outputDimensionality: DIM
+    });
+    return j.embedding ? [j.embedding.values] : (j.embeddings || []).map(e => e.values);
+  },
+  async generate(model, prompt, opts = {}) {
+    const body = { contents: [{ role: 'user', parts: [{ text: prompt }] }] };
+    if (opts.schema) body.generationConfig = { responseMimeType: 'application/json', responseSchema: opts.schema };
+    const j = await this.call(`/models/${model}:generateContent`, body);
+    return j?.candidates?.[0]?.content?.parts?.map(p => p.text).join('') ?? JSON.stringify(j);
+  },
+  async stream(model, prompt, onChunk) {
+    const key = requireKey();
+    const res = await fetch(`${BASE}/models/${model}:streamGenerateContent?alt=sse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = ''; let chunks = 0;
+    for (;;) {
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n'); buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        try { const j = JSON.parse(line.slice(5)); const t = j?.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || ''; chunks++; onChunk(t); } catch (_) {}
+      }
+    }
+    return chunks;
+  }
+};
+
+let sdkModule = null, sdkClient = null, sdkClientKey = '';
+const GeminiSDKProvider = {
+  name: 'sdk',
+  async client() {
+    const key = requireKey();
+    if (!sdkModule) {
+      const t0 = performance.now();
+      sdkModule = await import('https://cdn.jsdelivr.net/npm/@google/genai@latest/+esm');
+      results.sdkLoadMs = Math.round(performance.now() - t0);
+    }
+    if (!sdkClient || sdkClientKey !== key) { sdkClient = new sdkModule.GoogleGenAI({ apiKey: key }); sdkClientKey = key; }
+    return sdkClient;
+  },
+  async listModels() {
+    const ai = await this.client(); const out = [];
+    const pager = await ai.models.list({ config: { pageSize: 1000 } });
+    for await (const m of pager) out.push({ name: (m.name || '').replace('models/', ''), methods: m.supportedActions || m.supportedGenerationMethods || [] });
+    return out;
+  },
+  async embed(texts) {
+    const ai = await this.client();
+    // 逐筆呼叫，確保每段文字得到獨立向量
+    const vecs = [];
+    for (const t of texts) {
+      const r = await ai.models.embedContent({ model: EMBED_MODEL, contents: t, config: { outputDimensionality: DIM } });
+      vecs.push(r.embeddings[0].values);
+    }
+    return vecs;
+  },
+  async embedMultiInOne(texts) {
+    const ai = await this.client();
+    const r = await ai.models.embedContent({ model: EMBED_MODEL, contents: texts, config: { outputDimensionality: DIM } });
+    return (r.embeddings || []).map(e => e.values);
+  },
+  async generate(model, prompt, opts = {}) {
+    const ai = await this.client();
+    const config = opts.schema ? { responseMimeType: 'application/json', responseSchema: opts.schema } : undefined;
+    const r = await ai.models.generateContent({ model, contents: prompt, config });
+    return r.text;
+  }
+};
+const provider = () => ($('provider').value === 'sdk' ? GeminiSDKProvider : GeminiRestProvider);
+
+/* ============================================================
+ * 向量工具：Float32Array + cosine
+ * ============================================================ */
+const toF32 = arr => Float32Array.from(arr);
+const l2 = v => Math.sqrt(v.reduce((s, x) => s + x * x, 0));
+function cosine(a, b) { let d = 0, na = 0, nb = 0; for (let i = 0; i < a.length; i++) { d += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; } return d / (Math.sqrt(na) * Math.sqrt(nb)); }
+function dot(a, b) { let d = 0; for (let i = 0; i < a.length; i++) d += a[i] * b[i]; return d; }
+
+async function run(outId, label, fn) {
+  show(outId, `${label} 執行中…（provider=${provider().name}）`);
+  const t0 = performance.now();
+  try {
+    const data = await fn();
+    const ms = Math.round(performance.now() - t0);
+    results[label] = { provider: provider().name, ok: true, ms, data };
+    show(outId, { result: 'PASS', provider: provider().name, ms, ...data });
+  } catch (e) {
+    const ms = Math.round(performance.now() - t0);
+    results[label] = { provider: provider().name, ok: false, ms, error: e.message, status: e.status };
+    show(outId, { result: 'FAIL', provider: provider().name, ms, error: e.message, status: e.status, body: e.body });
+  }
+}
+
+/* ============================================================
+ * E-A 連線
+ * ============================================================ */
+$('btnList').onclick = () => run('listOut', 'E-A_models_list', async () => {
+  const models = await provider().listModels();
+  const embed = models.filter(m => m.name.includes('embedding')).map(m => m.name);
+  const gen = models.filter(m => (m.methods || []).some(x => /generateContent|generate/i.test(x)) && !m.name.includes('embedding')).map(m => m.name);
+  const sel = $('genModel'); sel.innerHTML = '';
+  gen.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o); });
+  const pref = gen.find(n => /flash/.test(n) && !/image|tts|live|audio/.test(n)); if (pref) sel.value = pref;
+  return { totalModels: models.length, embeddingModels: embed, hasGeminiEmbedding2: embed.includes(EMBED_MODEL), generationModelsSample: gen.slice(0, 25) };
+});
+
+$('btnFakeKey').onclick = () => run('listOut', 'E-E_invalid_key', async () => {
+  try {
+    await GeminiRestProvider.call('/models?pageSize=1', null, 'GET', 'FAKE_KEY_FOR_SPIKE_E');
+    return { readableError: false, note: '假金鑰竟然成功，異常' };
+  } catch (e) {
+    // 能讀到 status 與 message = CORS 在錯誤回應上也有放行，UI 才能顯示有意義的錯誤
+    return { readableError: e.status === 400 || e.status === 403, status: e.status, message: e.message };
+  }
+});
+
+/* ============================================================
+ * E-B Embedding
+ * ============================================================ */
+const DOCS = [
+  { title: '政府採購法 第18條', text: '採購之招標方式，分為公開招標、選擇性招標及限制性招標。' },
+  { title: '實驗室管理', text: '標準品開封後應標示開封日期，並依保存條件冷藏於 2 至 8 度。' },
+  { title: '天氣', text: '今天台北晴時多雲，午後可能有局部短暫雷陣雨。' }
+];
+const QUERY = '政府採購有哪幾種招標方式？';
+$('btnEmbedBatch').onclick = () => run('embedOut', 'E-B_embedding', async () => {
+  const docTexts = DOCS.map(d => `title: ${d.title} | text: ${d.text}`);   // 官方建議的文件格式
+  const queryText = `task: question answering | query: ${QUERY}`;           // 官方建議的查詢格式
+  const vecs = (await provider().embed([...docTexts, queryText])).map(toF32);
+  const q = vecs[vecs.length - 1];
+  const ranking = DOCS.map((d, i) => ({ doc: d.title, cosine: +cosine(q, vecs[i]).toFixed(4), dot: +dot(q, vecs[i]).toFixed(4) }))
+    .sort((a, b) => b.cosine - a.cosine);
+  return {
+    vectorCount: vecs.length,
+    dimensions: vecs.map(v => v.length),
+    l2Norms: vecs.map(v => +l2(v).toFixed(4)),
+    isFloat32Array: vecs.every(v => v instanceof Float32Array),
+    ranking,
+    top1IsProcurement: ranking[0].doc.includes('採購'),
+    cosineEqualsDot: ranking.every(r => Math.abs(r.cosine - r.dot) < 1e-3)
+  };
+});
+$('btnEmbedMulti').onclick = () => run('embedOut', 'E-B_multi_input', async () => {
+  const vecs = await provider().embedMultiInOne(DOCS.map(d => d.text));
+  return { inputsSent: DOCS.length, vectorsReturned: vecs.length, dims: vecs.map(v => v.length),
+    note: vecs.length === 1 ? '確認：多段輸入會合併成一個向量 → 批次必須拆成多個 request' : '多段輸入回傳多個向量' };
+});
+
+/* ============================================================
+ * E-C Generation
+ * ============================================================ */
+const genModel = () => { const m = $('genModel').value; if (!m) throw new Error('請先執行 models.list 並選擇生成模型'); return m; };
+$('btnGen').onclick = () => run('genOut', 'E-C_generate', async () => {
+  const model = genModel();
+  const text = await provider().generate(model, '請只回答數字：1 + 1 = ?');
+  return { model, text };
+});
+$('btnJson').onclick = () => run('genOut', 'E-C_structured', async () => {
+  const model = genModel();
+  const schema = { type: 'OBJECT', properties: { answer: { type: 'STRING' }, source_title: { type: 'STRING' } }, required: ['answer', 'source_title'] };
+  const raw = await provider().generate(model, `依據以下資料回答「${QUERY}」，並指出依據的資料標題。\n資料：${DOCS[0].title}：${DOCS[0].text}`, { schema });
+  let parsed = null, parseOk = false; try { parsed = JSON.parse(raw); parseOk = true; } catch (_) {}
+  return { model, parseOk, parsed, raw: parseOk ? undefined : raw };
+});
+$('btnStream').onclick = () => run('genOut', 'E-C_stream', async () => {
+  if (provider().name !== 'rest') throw new Error('串流測試只實作 REST 版本');
+  const model = genModel(); let acc = '';
+  const chunks = await GeminiRestProvider.stream(model, '用三句話介紹台灣的玉山。', t => { acc += t; $('genOut').textContent = acc; });
+  return { model, chunks, chars: acc.length, preview: acc.slice(0, 120) };
+});
+
+/* ============================================================
+ * E-E / E-F 紅隊檢查
+ * ============================================================ */
+function hasKey(haystack, key) { return !!key && typeof haystack === 'string' && haystack.includes(key); }
+// 修正 Errata E15：不使用 g 旗標，避免 lastIndex 殘留造成漏判
+const KEY_PATTERN = /AIza[0-9A-Za-z_\-]{35}/;
+
+async function scanIndexedDB(key) {
+  if (!indexedDB.databases) return { supported: false };
+  const dbs = await indexedDB.databases(); let found = false; const names = [];
+  for (const info of dbs) {
+    names.push(info.name);
+    await new Promise(resolve => {
+      const req = indexedDB.open(info.name);
+      req.onsuccess = () => {
+        const db = req.result; const stores = [...db.objectStoreNames];
+        if (!stores.length) { db.close(); return resolve(); }
+        const tx = db.transaction(stores, 'readonly'); let pending = stores.length;
+        stores.forEach(s => {
+          const g = tx.objectStore(s).getAll();
+          g.onsuccess = () => { try { if (hasKey(JSON.stringify(g.result), key)) found = true; } catch (_) {} if (--pending === 0) { db.close(); resolve(); } };
+          g.onerror = () => { if (--pending === 0) { db.close(); resolve(); } };
+        });
+      };
+      req.onerror = () => resolve();
+    });
+  }
+  return { supported: true, databases: names, found };
+}
+
+function buildMockExport() {
+  // 模擬未來的 Portable HTML 打包器：輸入只有 UI 範本 + 知識資料，沒有金鑰
+  const knowledge = { chunks: DOCS, embedding_config: { provider: 'google', model: EMBED_MODEL, dimensions: DIM } };
+  return `<!DOCTYPE html><html><body><script>const KNOWLEDGE=${JSON.stringify(knowledge)};<\/script></body></html>`;
+}
+
+$('btnRedTeam').onclick = async () => {
+  const key = getKey();
+  const tb = $('redTable').querySelector('tbody'); tb.innerHTML = '';
+  const rows = [];
+  const add = (item, pass, note) => {
+    rows.push({ item, result: pass === null ? 'WARN' : pass ? 'PASS' : 'FAIL', note });
+  };
+  if (!key) add('前置條件：需要先套用金鑰並發出至少一次請求', null, '目前沒有金鑰，部分檢查無法判定');
+
+  const reqs = window.__spike.requests;
+  add('① 金鑰沒有出現在任何請求 URL', !reqs.some(r => hasKey(r._url, key)), `共檢查 ${reqs.length} 筆請求`);
+  add('① 頁面網址（location.href）不含金鑰', !hasKey(location.href, key), location.href);
+  add('② 金鑰沒有寫進 console', !window.__spike.consoleLines.some(l => hasKey(l, key)), `共 ${window.__spike.consoleLines.length} 行 console 輸出`);
+  const idb = await scanIndexedDB(key);
+  add('③ 金鑰沒有寫進 IndexedDB', idb.supported ? !idb.found : null, idb.supported ? `資料庫：${idb.databases.join(', ') || '（無）'}` : '此瀏覽器不支援 indexedDB.databases()');
+  const inLocal = hasKey(JSON.stringify({ ...localStorage }), key);
+  const inSession = hasKey(JSON.stringify({ ...sessionStorage }), key);
+  const mode = results.keyMode || 'memory';
+  add('③ Web Storage 狀態符合所選模式', mode === 'memory' ? !inLocal && !inSession : mode === 'session' ? inSession && !inLocal : inLocal,
+      `模式=${mode}；localStorage 含金鑰=${inLocal}；sessionStorage 含金鑰=${inSession}`);
+  add('③ 頁面 DOM（outerHTML）不含金鑰', !hasKey(document.documentElement.outerHTML, key), 'input 欄位套用後會清空');
+  const exp = buildMockExport();
+  add('④ 模擬匯出 HTML 不含金鑰（S1）', !hasKey(exp, key) && !KEY_PATTERN.test(exp), `匯出內容 ${exp.length} bytes；同時用字串比對與格式比對`);
+  add('⑤ 模擬 .ragpack manifest 不含金鑰（S1）', !hasKey(JSON.stringify({ manifest: { embedding_config: { model: EMBED_MODEL } } }), key), '未來 .ragpack 實作時需要改成掃描真實輸出');
+  add('⑥ 金鑰沒有出現在任何請求 Body（Prompt / 內容）', !reqs.some(r => hasKey(r._body, key)), '檢查所有字串型 Body');
+  const foreign = reqs.filter(r => !ALLOWED_HOSTS.includes(r.host));
+  add('⑦ 沒有送往 Google 以外的主機（S3）', foreign.length === 0, foreign.length ? '異常主機：' + [...new Set(foreign.map(r => r.host))].join(', ') : `允許清單：${ALLOWED_HOSTS.join(', ')}（jsdelivr 僅用於載入 SDK，不帶金鑰）`);
+  const keyedHosts = [...new Set(reqs.filter(r => r.headerNames.includes('x-goog-api-key')).map(r => r.host))];
+  add('⑦ 帶金鑰的請求只送往 generativelanguage.googleapis.com', keyedHosts.every(h => h === 'generativelanguage.googleapis.com'), `帶金鑰的主機：${keyedHosts.join(', ') || '（尚無）'}`);
+
+  rows.forEach((r, i) => {
+    const tr = document.createElement('tr');
+    [String(i + 1), r.item, r.result, r.note].forEach((v, j) => { const td = document.createElement('td'); td.textContent = v; if (j === 2) td.className = r.result; tr.appendChild(td); });
+    tb.appendChild(tr);
+  });
+  results.redTeam = rows;
+};
+
+$('btnDeletedKey').onclick = async () => {
+  clearAllKeys(); sdkClient = null;
+  const before = window.__spike.requests.length;
+  let blocked = false, msg = '';
+  try { await provider().listModels(); } catch (e) { blocked = e.message.startsWith('LOCAL_GUARD'); msg = e.message; }
+  const sent = window.__spike.requests.length - before;
+  results['E-E_deleted_key'] = { provider: provider().name, blockedLocally: blocked, requestsSent: sent, message: msg };
+  show('keyOut', { result: blocked && sent === 0 ? 'PASS' : 'FAIL', blockedLocally: blocked, requestsSent: sent, message: msg });
+};
+
+/* ============================================================
+ * 網路紀錄表 + 報告
+ * ============================================================ */
+window.__renderNet = () => {
+  const tb = $('netTable').querySelector('tbody'); tb.innerHTML = '';
+  window.__spike.requests.slice(-40).forEach(r => {
+    const tr = document.createElement('tr');
+    [r.t.slice(11, 19), r.method, r.host, r.path, r.headerNames.join(', '), r.bodyBytes, r.status ?? '…', r.ms ?? ''].forEach(v => { const td = document.createElement('td'); td.textContent = String(v); tr.appendChild(td); });
+    tb.appendChild(tr);
+  });
+};
+
+$('btnReport').onclick = () => {
+  const key = getKey();
+  const redact = s => (key ? String(s).split(key).join('[REDACTED]') : String(s)).replace(new RegExp(KEY_PATTERN.source, 'g'), '[REDACTED]');
+  const report = {
+    spike: 'E', generatedAt: new Date().toISOString(), ...results,
+    requests: window.__spike.requests.map(({ _url, _body, ...r }) => r)
+  };
+  const text = redact(JSON.stringify(report, null, 2));
+  const blob = new Blob([text], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `spike-e-${location.protocol.replace(':', '')}-${provider().name}-${Date.now()}.json`;
+  a.click();
+};
+</script>
+</body>
+</html>

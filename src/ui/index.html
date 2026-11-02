@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZeroRAG Studio — 無伺服器知識應用編譯器 (MVP)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <!-- 頂部 Header 與狀態導航 -->
+    <header>
+      <div class="logo-area">
+        <h1>
+          <span>⚡ ZeroRAG Studio</span>
+          <span class="badge badge-cyan">v1.1.1 MVP</span>
+        </h1>
+        <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+          Knowledge → Evidence → Application Compiler (本機切塊 × 二進位向量 × 主張-證據查核)
+        </p>
+      </div>
+
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <span id="keyBadge" class="badge badge-warn" style="cursor: pointer;" title="點擊設定 API Key">
+          🔑 金鑰：未配置 (BYOK)
+        </span>
+        <span id="storageBadge" class="badge badge-purple">
+          本機快取：偵測中...
+        </span>
+        <button id="btnExportHtml" class="btn-secondary" style="width: auto; padding: 6px 14px; font-size: 12px;" disabled>
+          📦 匯出 Portable HTML
+        </button>
+      </div>
+    </header>
+
+    <div class="grid-main">
+      <!-- 左欄：文件切塊與知識庫建置 (Phase 1 & Phase 2) -->
+      <div>
+        <!-- 步驟 1: 文件來源與智慧切塊 -->
+        <div class="card">
+          <div class="card-title">
+            <span>📄 1. 文件輸入與智慧切塊</span>
+            <span id="chunkCountBadge" class="badge badge-cyan">0 分塊</span>
+          </div>
+
+          <div style="margin-bottom: 12px;">
+            <label>文件名稱 / 規章標題</label>
+            <input type="text" id="docNameInput" value="政府採購法規精選範本.md">
+          </div>
+
+          <div style="margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label style="margin-bottom: 0;">Markdown / TXT 文字內容 (MVP 專用)</label>
+              <button id="btnLoadSample" class="btn-secondary" style="width: auto; padding: 2px 8px; font-size: 11px;">
+                📋 載入採購法範例
+              </button>
+            </div>
+            <textarea id="sourceTextArea" placeholder="請在此貼入法規、SOP 或規範文件 Markdown / 純文字..."></textarea>
+          </div>
+
+          <button id="btnChunk" style="margin-bottom: 10px;">
+            ✂️ 執行結構感知智慧切塊 (Chunking)
+          </button>
+
+          <!-- 步驟 2: 向量化與二進位索引 -->
+          <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 14px; margin-top: 14px;">
+            <div class="card-title" style="font-size: 14px; margin-bottom: 10px;">
+              <span>⚡ 2. 向量化與二進位索引</span>
+              <span id="indexStatusBadge" class="badge badge-warn">索引：尚未建置</span>
+            </div>
+
+            <div id="vectorProgressBox" style="display: none; margin-bottom: 12px;">
+              <div style="background:#1e293b; height:6px; border-radius:999px; overflow:hidden;">
+                <div id="vectorProgressBar" style="background:linear-gradient(90deg, #38bdf8, #a855f7); width:0%; height:100%; transition:width 0.2s;"></div>
+              </div>
+              <div id="vectorProgressText" style="font-size: 11px; color: var(--primary); margin-top: 4px;"></div>
+            </div>
+
+            <div class="btn-group">
+              <button id="btnVectorize" disabled style="flex: 1;">
+                🚀 連線 Gemini 向量化
+              </button>
+              <button id="btnVectorizeSim" class="btn-secondary" disabled style="flex: 1;" title="0 Token 消耗快速體驗">
+                🧪 模擬合成向量
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 分塊預覽清單 -->
+        <div class="card" style="max-height: 400px; display: flex; flex-direction: column;">
+          <div class="card-title" style="margin-bottom: 8px;">
+            <span>📑 切塊結構預覽 (Chunks Preview)</span>
+          </div>
+          <div id="chunksContainer" style="overflow-y: auto; flex: 1; padding-right: 4px;">
+            <div style="color:var(--text-muted); padding:20px; text-align:center; font-size:13px;">
+              尚未生成切塊，請貼入文字並點擊「執行切塊」
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右欄：Claim-Evidence 查核儀表板 (Phase 3 & Phase 5) -->
+      <div>
+        <div class="card">
+          <div class="card-title">
+            <span>🔍 3. 法規與 SOP 查核審計儀表板 (Audit Dashboard)</span>
+            <span class="badge badge-purple">Claim-Evidence 映射</span>
+          </div>
+
+          <div style="margin-bottom: 14px;">
+            <label>待查核之事實、行為或規章問題</label>
+            <div style="display: flex; gap: 10px;">
+              <input type="text" id="auditSubjectInput" value="機關招標時，得否在規格中指定特定廠牌型號？" placeholder="例如：檢驗報告書經檢驗員簽名後，是否仍須品保主管覆核？">
+              <button id="btnRunAudit" style="width: auto; padding: 10px 20px; white-space: nowrap;" disabled>
+                ⚖️ 執行事實查核
+              </button>
+            </div>
+          </div>
+
+          <div id="auditStatusText" style="font-size: 12px; color: var(--primary); margin-bottom: 12px; min-height: 18px;">
+            請先完成左側切塊與索引建置。
+          </div>
+
+          <!-- 候選證據展示 -->
+          <div id="evidenceCandidatesBox" style="margin-bottom: 16px;"></div>
+
+          <!-- 查核報告與 Claim-Evidence 表格 -->
+          <div id="auditReportResult" style="display: none; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px;">
+            <div id="auditReportSummary" class="card" style="background:#0c1220; border-color:rgba(56,189,248,0.3); margin-bottom:16px;"></div>
+
+            <div style="font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px;">
+              📊 單一事實主張查核與防擴張對照表 (Claims Verification Table)：
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 70px;">編號</th>
+                  <th>事實主張 (Claim) 與適用範圍警示</th>
+                  <th style="width: 120px;">檢驗狀態</th>
+                  <th>精確出處引句 (Evidence Quote)</th>
+                </tr>
+              </thead>
+              <tbody id="claimsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- API Key BYOK 設定彈窗 (S1, S2, S7) -->
+  <div id="keyModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="color: #fff; font-size: 17px;">🔑 Google Gemini API Key 設定 (BYOK)</h3>
+        <span id="btnModalClose" style="cursor: pointer; font-size: 18px; color: var(--text-muted);">&times;</span>
+      </div>
+
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">
+        ZeroRAG 嚴格秉持 Local-First 原則。您的金鑰直連 Google 官方端點，絕對不會上傳至任何開發者伺服器 (S1~S3)。
+      </p>
+
+      <div style="margin-bottom: 14px;">
+        <label>Gemini API Key</label>
+        <input type="password" id="apiKeyInput" placeholder="AIzaSy...">
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <label>儲存隔離模式</label>
+        <select id="keyStoreSelect">
+          <option value="session" selected>Session-Only（記憶體暫存，分頁關閉即刻銷毀 - 推薦）</option>
+          <option value="local">本機儲存（保存於瀏覽器 LocalStorage，下次自動載入）</option>
+        </select>
+      </div>
+
+      <div style="font-size: 11px; color: #94a3b8; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; margin-bottom: 16px;">
+        ℹ️ <strong>資料邊界提示 (S7)</strong>：<br>
+        • 免費金鑰 (L1)：資料可能依 Google 條款用於改善產品。<br>
+        • 付費金鑰 (L2)：不用於改善產品，但為防濫用短期保留日誌。
+      </div>
+
+      <div style="display: flex; justify-content: space-between; gap: 10px;">
+        <button id="btnClearKey" class="btn-danger" style="width: auto;">🗑️ 清除金鑰</button>
+        <button id="btnSaveKey" style="width: auto; padding: 10px 20px;">確認保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

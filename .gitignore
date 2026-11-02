@@ -1,0 +1,25 @@
+# ZeroRAG .gitignore
+# Rule 9: Credential Hygiene & Zero-Leak Invariant
+
+# API Keys & Secrets
+.env
+.env.*
+!.env.example
+*.key
+*.token
+credentials.json
+
+# Dependencies & Build
+node_modules/
+dist/
+.cache/
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs & Temporary Spikes Data
+*.log
+npm-debug.log*

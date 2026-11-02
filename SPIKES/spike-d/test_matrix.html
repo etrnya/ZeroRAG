@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZeroRAG Spike D — file:// 本機協議相容性與隔離性測試矩陣</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(22, 30, 49, 0.75);
+      --card-border: rgba(56, 189, 248, 0.2);
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --code-bg: #0f172a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 24px; line-height: 1.5; }
+    .container { max-width: 1000px; margin: 0 auto; }
+    .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    h1 { font-size: 22px; color: #fff; margin-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; }
+    th, td { padding: 9px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); text-align: left; }
+    th { color: var(--text-muted); }
+    .pass { color: var(--success); font-weight: bold; }
+    .warn { color: var(--warning); font-weight: bold; }
+    .fail { color: var(--danger); font-weight: bold; }
+    button { background: var(--primary); color: #000; font-weight: bold; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; }
+    pre { background: var(--code-bg); padding: 12px; border-radius: 8px; font-size: 12px; color: #cbd5e1; margin-top: 12px; max-height: 200px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>ZeroRAG Spike D — file:// 本機協議相容性診斷儀表板</h1>
+      <p style="color: var(--text-muted); font-size: 13px;">
+        檢驗離線雙擊開啟 (`file://`) 時，現代瀏覽器對於儲存、執行緒、解壓與外部 API 請求之限制邊界。
+      </p>
+      <div style="margin-top: 12px; display:flex; gap:10px;">
+        <button id="btnRun">⚡ 執行全自動相容性檢驗</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📋 相容性測試矩陣 (Compatibility Matrix)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>檢測項目</th>
+            <th>測試功能</th>
+            <th>實測結果</th>
+            <th>狀態與備註</th>
+          </tr>
+        </thead>
+        <tbody id="matrixBody">
+          <!-- 動態填入 -->
+        </tbody>
+      </table>
+      <pre id="logOutput">[就緒] 點擊「執行全自動相容性檢驗」開始測試...</pre>
+    </div>
+  </div>
+
+  <script>
+    const logEl = document.getElementById('logOutput');
+    const tbody = document.getElementById('matrixBody');
+    function log(msg) {
+      logEl.textContent += `\n${msg}`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    const tests = [
+      {
+        id: 'inline_script',
+        name: 'inline <script> 執行',
+        run: async () => true,
+        desc: '基本 JavaScript 執行環境'
+      },
+      {
+        id: 'decomp_stream',
+        name: 'DecompressionStream 原生支援',
+        run: async () => typeof DecompressionStream !== 'undefined',
+        desc: 'C2 方案解壓縮核心 API'
+      },
+      {
+        id: 'indexed_db',
+        name: 'IndexedDB 讀寫支援',
+        run: async () => {
+          return new Promise((resolve) => {
+            const req = indexedDB.open('SpikeD_TestDB', 1);
+            req.onupgradeneeded = (e) => e.target.result.createObjectStore('test');
+            req.onsuccess = () => {
+              const db = req.result;
+              const tx = db.transaction(['test'], 'readwrite');
+              tx.objectStore('test').put('val', 'k');
+              tx.oncomplete = () => { db.close(); resolve(true); };
+              tx.onerror = () => resolve(false);
+            };
+            req.onerror = () => resolve(false);
+          });
+        },
+        desc: '本機快取與向量資料庫'
+      },
+      {
+        id: 'web_storage',
+        name: 'localStorage / sessionStorage',
+        run: async () => {
+          try {
+            sessionStorage.setItem('spike_d_test', '1');
+            return sessionStorage.getItem('spike_d_test') === '1';
+          } catch (e) {
+            return false;
+          }
+        },
+        desc: 'Session-Only 模式金鑰暫存'
+      },
+      {
+        id: 'blob_worker',
+        name: 'Web Worker (Blob URL 內嵌模式)',
+        run: async () => {
+          return new Promise((resolve) => {
+            try {
+              const code = "self.onmessage = () => self.postMessage('ok');";
+              const blob = new Blob([code], { type: 'application/javascript' });
+              const url = URL.createObjectURL(blob);
+              const w = new Worker(url);
+              w.onmessage = (e) => {
+                w.terminate();
+                URL.revokeObjectURL(url);
+                resolve(e.data === 'ok');
+              };
+              w.onerror = () => resolve(false);
+              w.postMessage('ping');
+            } catch (e) {
+              resolve(false);
+            }
+          });
+        },
+        desc: '免外部檔案啟動背景背景運算緒'
+      },
+      {
+        id: 'cors_rest',
+        name: 'fetch() 呼叫 Google Gemini (CORS 預檢)',
+        run: async () => {
+          try {
+            // 發送預檢 OPTIONS 或無效 key 請求檢測 CORS 標頭
+            const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?key=AIzaSy_FAKE_SPIKE_D', {
+              method: 'GET'
+            });
+            // 收到 400 API key invalid 表示網路通訊與 CORS 均放行！
+            return res.status === 400 || res.status === 200;
+          } catch (e) {
+            // 若被 CORS 攔截會拋出 TypeError: Failed to fetch
+            return false;
+          }
+        },
+        desc: '驗證 Origin: null 下 Google API 能否通訊'
+      },
+      {
+        id: 'clipboard_api',
+        name: 'Clipboard API (剪貼簿複製)',
+        run: async () => typeof navigator.clipboard !== 'undefined' && typeof navigator.clipboard.writeText === 'function',
+        desc: '匯出成果與報告複製'
+      }
+    ];
+
+    document.getElementById('btnRun').addEventListener('click', async () => {
+      tbody.innerHTML = '';
+      log('開始執行 Spike D 相容性診斷測試...');
+      log(`當前執行協議: ${window.location.protocol} (是否為 file:// : ${window.location.protocol === 'file:'})`);
+
+      for (const t of tests) {
+        log(`正在檢測: ${t.name}...`);
+        let passed = false;
+        try {
+          passed = await t.run();
+        } catch (err) {
+          log(`  異常: ${err.message}`);
+          passed = false;
+        }
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${t.name}</strong></td>
+          <td>${t.desc}</td>
+          <td>${passed ? '<span class="pass">✅ 支援 (PASS)</span>' : '<span class="warn">⚠️ 受限 / 不支援</span>'}</td>
+          <td>${passed ? '核心功能運作正常' : '可能受同源政策限制'}</td>
+        `;
+        tbody.appendChild(tr);
+        log(`  結果: ${passed ? '✅ 通過' : '⚠️ 受限'}`);
+      }
+
+      log('Spike D 相容性檢驗完畢！');
+    });
+  </script>
+</body>
+</html>
