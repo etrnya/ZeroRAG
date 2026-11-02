@@ -1,0 +1,30 @@
+{
+  "name": "zerorag",
+  "version": "1.1.1",
+  "description": "ZeroRAG: 無伺服器知識應用編譯器 (Knowledge → Evidence → Application Compiler)",
+  "main": "src/core/chunking.js",
+  "type": "module",
+  "scripts": {
+    "test": "node src/test_core.js",
+    "benchmark:b": "node SPIKES/spike-b/benchmark_node.js",
+    "benchmark:c": "node SPIKES/spike-c/benchmark_c.js",
+    "start": "python -m http.server 8765"
+  },
+  "keywords": [
+    "rag",
+    "local-first",
+    "gemini-api",
+    "byok",
+    "serverless",
+    "vector-search",
+    "claim-evidence",
+    "audit-dashboard",
+    "binary-embeddings"
+  ],
+  "author": "彥廷 (etrnya)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/etrnya/ZeroRAG.git"
+  }
+}
